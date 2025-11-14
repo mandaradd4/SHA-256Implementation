@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>SHA-256 — Step-by-step</title>
+
+<style>
+/* ============= THEME VARIABLES ============= */
+:root{
+  --bg1:#6e8efb; 
+  --bg2:#a777e3; 
+  --card:rgba(255,255,255,0.12);
+  --text:#fff; 
+  --muted:#e9f5ff;
+}
+.dark-mode{
+  --bg1:#0f1724; 
+  --bg2:#111827; 
+  --card:rgba(255,255,255,0.06);
+  --text:#eaeaea; 
+  --muted:#cbd5e1;
+}
+
+/* ============= GLOBAL ============= */
+*{box-sizing:border-box}
+body{
+  margin:0; font-family:Inter,system-ui,Arial;
+  background:linear-gradient(135deg,var(--bg1),var(--bg2));
+  color:var(--text);
+  min-height:100vh;
+  padding:0;
+}
+#modeToggle{
+  position:fixed; right:18px; top:18px; 
+  padding:8px 10px; border-radius:999px;
+  border:none; background:rgba(255,255,255,0.9);
+  cursor:pointer; z-index:50;
+}
+
+/* =====================================================
+   BEAUTIFUL LANDING PAGE
+   ===================================================== */
+#landing{
+  position:relative;
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  text-align:center;
+  padding:40px 20px;
+  overflow:hidden;
+}
+
+.hero-title{
+  font-size:52px;
+  font-weight:800;
+  margin-bottom:32px;
+  text-shadow:0 6px 18px rgba(0,0,0,0.35);
+}
+
+.startBtn{
+  padding:14px 28px;
+  font-size:18px;
+  border-radius:14px;
+  border:none;
+  background:linear-gradient(135deg,#ff9a9e,#fad0c4);
+  color:#222; font-weight:700;
+  cursor:pointer;
+  transition:0.25s;
+  box-shadow:0 8px 30px rgba(0,0,0,0.25);
+}
+.startBtn:hover{
+  transform:scale(1.08);
+  box-shadow:0 12px 35px rgba(0,0,0,0.32);
+}
+
+/* Floating glowing shapes */
+.float{
+  position:absolute;
+  width:180px; height:180px;
+  border-radius:50%;
+  filter:blur(90px);
+  opacity:0.60;
+  z-index:-1;
+  animation:floatAnim 9s infinite ease-in-out;
+}
+.float1{background:#ff9a9e; top:-40px; left:-40px;}
+.float2{background:#a6c1ee; bottom:-40px; right:-20px;}
+.float3{background:#b19cff; top:260px; right:200px; animation-delay:2s;}
+
+@keyframes floatAnim{
+  0%{transform:translateY(0)}
+  50%{transform:translateY(-40px)}
+  100%{transform:translateY(0)}
+}
+#app{
+  display:none;
+  padding:40px 20px;
+  display:none;
+  justify-content:center;
+}
+.card{
+  width:100%;
+  max-width:900px;
+  background:var(--card);
+  backdrop-filter:blur(10px);
+  padding:24px;
+  border-radius:14px;
+  box-shadow:0 12px 40px rgba(0,0,0,0.3);
+  margin:0 auto;
+}
+.pageTitle{
+  margin-top:0;
+  font-size:24px;
+}
+.muted{
+  color:var(--muted); 
+  font-size:14px; 
+  margin-bottom:14px;
+}
+textarea{
+  width:100%; padding:12px; border:none;
+  border-radius:8px; background:#fff; color:#222;
+  font-size:15px;
+  min-height:80px;
+}
+.compute{
+  margin-top:10px;
+  padding:10px 14px;
+  border:none; border-radius:8px;
+  background:#ffd166; color:#222;
+  font-weight:700; cursor:pointer;
+}
+pre{
+  background:rgba(0,0,0,0.45);
+  padding:10px; border-radius:8px;
+  color:var(--muted);
+}
+.binary-pre{
+  white-space:pre;
+  font-family:monospace;
+  font-size:13px;
+  background:rgba(0,0,0,0.3);
+  padding:10px;
+  border-radius:8px;
+  overflow:auto;
+}
+.label{font-weight:700;margin-bottom:6px}
+.step{margin-top:16px}
+.small{font-size:13px;color:var(--muted)}
+</style>
+</head>
+
+<body>
+
+<button id="modeToggle">🌙 Dark</button>
+
+<!-- ===================== LANDING ======================= -->
+<section id="landing">
+  <div>
+    <h1 class="hero-title">🔐 SHA-256 Explorer</h1>
+
+    <!-- ⭐ SUBTITLE REMOVED HERE ⭐ -->
+
+    <button id="startBtn" class="startBtn">Start</button>
+  </div>
+
+  <div class="float float1"></div>
+  <div class="float float2"></div>
+  <div class="float float3"></div>
+</section>
+
+<!-- ===================== APP ======================= -->
+<main id="app" aria-hidden="true">
+  <div class="card">
+    <h1 class="pageTitle">SHA-256 — Step-by-step</h1>
+    <div class="muted">This shows EXACTLY how the hash is computed for your input.</div>
+
+    <label class="label">Enter text</label>
+    <textarea id="text">Hii</textarea>
+    <button id="computeBtn" class="compute">Compute SHA-256</button>
+
+    <div class="step"><div class="label">Input</div><div id="inputValue" class="small"></div></div>
+    <div class="step"><div class="label">ASCII values</div><pre id="asciiValues"></pre></div>
+    <div class="step"><div class="label">Binary (8-bit each)</div><pre id="binaryValues"></pre></div>
+
+    <div class="step">
+      <div class="label">Combined bitstream</div>
+      <pre id="combinedBits" class="binary-pre"></pre>
+      <div id="combinedInfo" class="small"></div>
+    </div>
+
+    <div class="step">
+      <div class="label">Padding (exact math)</div>
+      <pre id="paddingExplain"></pre>
+    </div>
+
+    <div class="step">
+      <div class="label">512-bit block(s)</div>
+      <div id="blocksArea"></div>
+    </div>
+
+    <div class="step">
+      <div class="label">64 Rounds Summary</div>
+      <pre id="roundsSummary" class="small"></pre>
+    </div>
+
+    <div class="step">
+      <div class="label">H0..H7 updated</div>
+      <pre id="hUpdate" class="small"></pre>
+    </div>
+
+    <div class="step">
+      <div class="label">Final 256-bit Digest</div>
+      <pre id="finalHex"></pre>
+    </div>
+
+  </div>
+</main>
+
+<!-- ================= JavaScript ================= -->
+<script>
+const startBtn=document.getElementById("startBtn");
+const landing=document.getElementById("landing");
+const app=document.getElementById("app");
+startBtn.onclick=()=>{
+  landing.style.display="none";
+  app.style.display="flex";
+  app.setAttribute("aria-hidden","false");
+};
+
+document.getElementById("modeToggle").onclick=()=>{
+  document.body.classList.toggle("dark-mode");
+};
+
+/* SHA-256 engine functions (unchanged) */
+function ROTR(n,x){return (x>>>n)|((x<<(32-n))>>>0);}
+function SHR(n,x){return x>>>n;}
+function Sigma0(x){return (ROTR(2,x)^ROTR(13,x)^ROTR(22,x))>>>0;}
+function Sigma1(x){return (ROTR(6,x)^ROTR(11,x)^ROTR(25,x))>>>0;}
+function sigma0(x){return (ROTR(7,x)^ROTR(18,x)^SHR(3,x))>>>0;}
+function sigma1(x){return (ROTR(17,x)^ROTR(19,x)^SHR(10,x))>>>0;}
+function Ch(x,y,z){return ((x&y)^(~x&z))>>>0;}
+function Maj(x,y,z){return ((x&y)^(x&z)^(y&z))>>>0;}
+function add32(...a){let s=0;for(let x of a)s=(s+(x>>>0))>>>0;return s;}
+
+const K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,
+0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,
+0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,
+0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,
+0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,
+0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,
+0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,
+0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,
+0xbef9a3f7,0xc67178f2];
+
+const H0_INIT=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,
+               0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+
+function makePaddedBlocks(bytes){
+  const bitLen=BigInt(bytes.length)*8n;
+  const padBytes=(64-((bytes.length+1+8)%64))%64;
+  const finalLen=bytes.length+1+padBytes+8;
+
+  let out=new Uint8Array(finalLen);
+  out.set(bytes,0);
+  out[bytes.length]=0x80;
+
+  let dv=new DataView(out.buffer);
+  dv.setUint32(finalLen-8,Number(bitLen>>32n),false);
+  dv.setUint32(finalLen-4,Number(bitLen & 0xffffffffn),false);
+
+  const blocks=[];
+  for(let i=0;i<finalLen;i+=64){
+    let words=[];
+    for(let j=0;j<64;j+=4){
+      words.push(((out[i+j]<<24)|(out[i+j+1]<<16)|
+                (out[i+j+2]<<8)|(out[i+j+3]))>>>0);
+    }
+    blocks.push({words});
+  }
+  return {blocks,bitLen:Number(bitLen),padBytes,totalBits:finalLen*8};
+}
+
+function buildW(words){
+  const W=new Uint32Array(64);
+  for(let i=0;i<16;i++)W[i]=words[i];
+  for(let t=16;t<64;t++){
+    W[t]=add32(W[t-16],sigma0(W[t-15]),W[t-7],sigma1(W[t-2]));
+  }
+  return W;
+}
+
+function compress(H,W){
+  let [a,b,c,d,e,f,g,h]=H;
+  for(let t=0;t<64;t++){
+    const T1=add32(h,Sigma1(e),Ch(e,f,g),K[t],W[t]);
+    const T2=add32(Sigma0(a),Maj(a,b,c));
+    h=g; g=f; f=e; e=add32(d,T1);
+    d=c; c=b; b=a; a=add32(T1,T2);
+  }
+  return [
+    add32(H[0],a),add32(H[1],b),add32(H[2],c),add32(H[3],d),
+    add32(H[4],e),add32(H[5],f),add32(H[6],g),add32(H[7],h)
+  ];
+}
+
+function hex32(x){return (x>>>0).toString(16).padStart(8,"0");}
+function bin32(x){return (x>>>0).toString(2).padStart(32,"0");}
+
+/* UI refs */
+const inputValue=document.getElementById("inputValue");
+const asciiEl=document.getElementById("asciiValues");
+const binaryEl=document.getElementById("binaryValues");
+const combinedEl=document.getElementById("combinedBits");
+const combinedInfo=document.getElementById("combinedInfo");
+const paddingEl=document.getElementById("paddingExplain");
+const blocksArea=document.getElementById("blocksArea");
+const roundsSummary=document.getElementById("roundsSummary");
+const hUpdate=document.getElementById("hUpdate");
+const finalHex=document.getElementById("finalHex");
+
+document.getElementById("computeBtn").onclick=()=>{
+  let text=document.getElementById("text").value;
+  const encoder=new TextEncoder();
+  const bytes=encoder.encode(text);
+
+  inputValue.textContent=JSON.stringify(text);
+  
+  asciiEl.textContent=text.split("").map(ch=>`${ch} → ${ch.charCodeAt(0)}`).join("\n");
+
+  binaryEl.textContent=text.split("").map((ch,i)=>`${ch} → ${bytes[i].toString(2).padStart(8,"0")}`).join("\n");
+
+  let allBits=[...bytes].map(b=>b.toString(2).padStart(8,"0")).join("");
+  combinedEl.textContent=allBits.slice(0,256)+(allBits.length>256?" ...":"");
+  combinedInfo.textContent=`Total bits = ${allBits.length}`;
+
+  const {blocks,bitLen,padBytes,totalBits}=makePaddedBlocks(bytes);
+  paddingEl.textContent=
+`Original length = ${bitLen} bits
+k = ${padBytes*8} zero bits
+Total padded = ${totalBits} bits`;
+
+  let html="";
+  blocks.forEach((blk,i)=>{
+    html+=`<div><b>Block ${i}</b><pre class='binary-pre'>`+
+          blk.words.map(w=>bin32(w)).join("\n")+
+          `</pre><div class='small'>`+
+          blk.words.map((w,j)=>`W${j}=${hex32(w)}`).join(" ")+`</div></div>`;
+  });
+  blocksArea.innerHTML=html;
+
+  let H=H0_INIT.slice();
+  let summary="";
+  blocks.forEach((blk,i)=>{
+    const W=buildW(blk.words);
+    H=compress(H,W);
+    summary+=`Block ${i}: processed 64 rounds\n`;
+  });
+  roundsSummary.textContent=summary;
+
+  hUpdate.textContent=H.map((v,i)=>`H${i} = ${hex32(v)}`).join("\n");
+  finalHex.textContent=H.map(x=>hex32(x)).join("");
+};
+</script>
+
+</body>
+</html>
